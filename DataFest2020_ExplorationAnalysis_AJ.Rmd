@@ -1,0 +1,110 @@
+---
+title: "DataFest2020_ExplorationAnalysis_AJ"
+author: "Ashlyn Jew"
+date: "5/10/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load data
+```{r}
+crime2020 <- read.csv("Crime_Data_from_2020_to_Present.csv")
+crime2010 <- read.csv("Crime_Data_from_2010_to_2019.csv")
+crime <- rbind(crime2010, crime2020)
+```
+
+#Clean data
+```{r}
+library(tidyverse)
+
+#delete DR_NO, Rpt.Dist.No, Part.1-2, Mocodes, Crm.Cd.1, Crm.Cd.2, Crm.Cd.3, Crm.Cd.4 columns
+crime <- crime[-c(1, 7, 8, 11, 21, 22, 23, 24)]
+
+#rename columns
+names(crime) <- c("Date_Rptd", "Date_Occ", "Time_Occ", "Area_Code", "Area_Name", "Crm_Code", "Crm_Desc", "Vict_Age", "Vict_Sex", "Vict_Descent", "Premis_Code", "Premis_Desc", "Weapon_Code", "Weapon_Desc", "Status_Code", "Stat_Desc", "Location", "Cross_Street", "Lat", "Lon")
+
+#convert Date.Rptd, DATE.OCC from factor to Date
+crime$Date_Rptd <-  as.Date(crime$Date_Rptd, format = "%m/%d/%Y")
+crime$Date_Occ <- as.Date(crime$Date_Occ, format = "%m/%d/%Y")
+
+#filter for just 2019 and 2020 data
+crime <- crime %>% filter(Date_Occ > "2018-12-31")
+#arrange by ascending date and time
+crime <- crime %>% arrange(Date_Occ, Time_Occ)
+```
+
+#Exploration Analysis
+```{r}
+library(ggplot2)
+
+crime_1920 <- crime %>% filter(DATE.OCC > "2018-12-31")
+crime_20 <- crime %>% filter(DATE.OCC > "2019-12-31")
+
+ggplot(data = crime_20,
+       mapping = aes(AREA.NAME,
+                     fill = factor(month(crime_20$DATE.OCC)))) + geom_histogram(stat = "count")
+```
+
+Doesn't seem like there's any significant increase in crime.
+
+```{r}
+table(crime_20$DATE.OCC)
+plot(table(crime_20$DATE.OCC), type = "l")
+```
+
+```{r}
+crime_20 %>% 
+  filter(Crm.Cd.Desc %in% c(c("BURGLARY", "ROBBERY"))) %>% 
+  group_by(month(DATE.OCC)) %>% 
+  summarise(
+    n = n()
+  )
+
+crime_1920 %>% 
+  filter(Crm.Cd.Desc %in% c(c("BURGLARY", "ROBBERY"))) %>% 
+  group_by(year(DATE.OCC), month(DATE.OCC)) %>% 
+  summarise(
+    n = n()
+  )
+```
+
+Seems like there's like a <100 decrease in burglary/robbery each month compared to last year
+
+```{r}
+crime_1920 %>% 
+  group_by(year(DATE.OCC), month(DATE.OCC)) %>% 
+  summarise(
+    n = n()
+  )
+```
+In March and April there's a 3000ish decrease in overall reported crimes
+
+```{r}
+crime_20 %>% 
+  group_by(month(DATE.OCC), AREA.NAME) %>% 
+  summarise(
+    n = n()
+  )
+```
+
+```{r}
+
+#Descent Code: A - Other Asian B - Black C - Chinese D - Cambodian F - Filipino G - Guamanian H - Hispanic/Latin/Mexican I - American Indian/Alaskan Native J - Japanese K - Korean L - Laotian O - Other P - Pacific Islander S - Samoan U - Hawaiian V - Vietnamese W - White X - Unknown Z - Asian Indian
+crime_20 %>% 
+  group_by(month(DATE.OCC), Vict.Descent) %>% 
+  summarise(
+    n = n()
+  )
+
+crime_1920 %>% 
+  filter(Vict.Descent == "C") %>% 
+  group_by(year(DATE.OCC), month(DATE.OCC), Vict.Descent) %>% 
+  summarise(
+    n = n()
+  )
+```
+
+Doesn't seem like there's any increase in Chinese victims compared to last year.

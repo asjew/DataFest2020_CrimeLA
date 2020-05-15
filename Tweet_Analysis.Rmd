@@ -1,0 +1,114 @@
+---
+title: "Tweet Analysis"
+author: "Ashlyn Jew"
+date: "5/14/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Text and sentiment analysis of tweets including keywords "anti-asian" and "virus" (scraped from Jan 24th to May 10th).
+
+## Tokenize text, remove irrelevant words, get count of each word
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+antiasian <- read_csv("anti-asian-3.csv")
+
+#without stop words
+my_stop_words <- stop_words %>% select(-lexicon) %>% 
+  bind_rows(data.frame(word = c("asian", "anti", "virus", "https", "twitter.com", "status", "19", "pic.twitter.com", "it’s", "04", "02", "03", "http")))
+
+ordered_text_count <- antiasian %>%
+  select(text) %>%
+  unnest_tokens(word,text) %>% 
+  add_count(word) %>% 
+  distinct() %>% 
+  anti_join(my_stop_words) %>% 
+  arrange(desc(n))
+
+ordered_text_count
+```
+
+# Histogram of Words That Appear in “Anti-Asian Virus” Tweets
+
+```{r}
+ordered_text_count %>%
+  filter(n > 110) %>%
+  mutate(rel_freq = n/sum(n)) %>% 
+  mutate(word = reorder(word, rel_freq)) %>% 
+  ggplot(aes(word, rel_freq)) +
+  geom_col(fill = "#6baed6") +
+  xlab(NULL) +
+  ylab("Relative Frequency of Word") +
+  ggtitle("Histogram of Words That Appear in “Anti-Asian Virus” Tweets")+
+  coord_flip()
+
+```
+
+# Wordcloud
+
+```{r}
+library(wordcloud)
+
+wordcloud(ordered_text_count$word, freq = ordered_text_count$n, max.words = 50, colors = c("#fc8d59", "#ef6548", "#d7301f", "#990000"))
+```
+
+# Assigning different sentiment values
+
+```{r}
+library(textdata)
+
+#assigns numeric values
+afinn_sent <- get_sentiments("afinn")
+
+#negative or positive
+bing_sent <- get_sentiments("bing")
+
+#emotion
+nrc_sent <- get_sentiments("nrc")
+
+#emotion words
+ordered_text_count %>%
+  left_join(nrc_sent) %>% 
+  filter(!is.na(sentiment), word != "trump")
+#summary of emotion words
+ emotion_summary <- ordered_text_count %>%
+  left_join(nrc_sent) %>% 
+  filter(!is.na(sentiment), word != "trump") %>% 
+  group_by(sentiment) %>% 
+  summarise(n = n())
+ 
+ emotion_summary
+ 
+ #affin
+ ordered_text_count %>% 
+   left_join(afinn_sent) %>% 
+   filter(!is.na(value)) %>% 
+   summarise(mean_value = mean(value))
+ 
+ #bing
+  bing_summary <- ordered_text_count %>% 
+   left_join(bing_sent) %>% 
+   filter(!is.na(sentiment), word != "trump") %>% 
+  group_by(sentiment)
+  
+  bing_summary
+```
+
+# Histogram of Tweet Sentiments
+```{r}
+sum(bing_summary[bing_summary$sentiment == "negative", ]$n)
+sum(bing_summary$n)
+
+ggplot(bing_summary, aes(x = sentiment, y = n/sum(n))) +
+  geom_bar(stat="identity", fill = "#7bccc4") +
+  xlab("Sentiment") +
+  ylab("Relative Frequency") +
+  ggtitle("Histogram of Tweet Sentiments" )
+```
+
